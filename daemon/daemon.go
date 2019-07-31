@@ -931,7 +931,7 @@ func NewDaemon(dp datapath.Datapath, iptablesManager rulesManager) (*Daemon, *en
 	bootstrapStats.proxyStart.Start()
 	// FIXME: Make the port range configurable.
 	d.l7Proxy = proxy.StartProxySupport(10000, 20000, option.Config.RunDir,
-		option.Config.AccessLog, &d, option.Config.AgentLabels, d.datapath)
+		option.Config.AccessLog, &d, option.Config.AgentLabels, d.datapath, d.endpointManager)
 	bootstrapStats.proxyStart.End(true)
 
 	bootstrapStats.fqdn.Start()
