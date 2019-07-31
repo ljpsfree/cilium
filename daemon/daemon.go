@@ -743,6 +743,7 @@ func NewDaemon(dp datapath.Datapath, iptablesManager rulesManager) (*Daemon, *en
 	identity.InitWellKnownIdentities()
 
 	epMgr := endpointmanager.NewEndpointManager(&endpointsynchronizer.EndpointSynchronizer{})
+	epMgr.InitMetrics()
 
 	// Cleanup flannel on exit
 	cleanupFuncs.Add(func() {
@@ -769,8 +770,6 @@ func NewDaemon(dp datapath.Datapath, iptablesManager rulesManager) (*Daemon, *en
 		iptablesManager:   iptablesManager,
 		endpointManager:   epMgr,
 	}
-
-	endpointmanager.GlobalEndpointManager = endpointmanager.NewEndpointManager(&endpointsynchronizer.EndpointSynchronizer{})
 
 	if option.Config.RunMonitorAgent {
 		monitorAgent, err := monitoragent.NewAgent(context.TODO(), defaults.MonitorBufferPages)
