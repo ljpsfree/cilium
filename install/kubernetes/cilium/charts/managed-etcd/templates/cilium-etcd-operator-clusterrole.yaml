@@ -47,12 +47,6 @@ rules:
   - get
   - update
 - apiGroups:
-  - ""
-  resources:
-  - componentstatuses
-  verbs:
-  - get
-- apiGroups:
   - extensions
   resources:
   - deployments
