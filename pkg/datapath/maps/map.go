@@ -27,7 +27,6 @@ import (
 	"github.com/cilium/cilium/pkg/endpointmanager"
 	"github.com/cilium/cilium/pkg/logging"
 	"github.com/cilium/cilium/pkg/logging/logfields"
-	bpfconfig "github.com/cilium/cilium/pkg/maps/configmap"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"github.com/cilium/cilium/pkg/maps/policymap"
 	"github.com/cilium/cilium/pkg/option"
@@ -132,7 +131,8 @@ func (ms *mapSweeper) walk(path string, _ os.FileInfo, _ error) error {
 		ctmap.MapNameAny6,
 		ctmap.MapNameAny4,
 		loader.CallsMapName,
-		bpfconfig.MapNamePrefix,
+		// Remove this line after v1.7
+		"cilium_ep_config_",
 		endpoint.IpvlanMapName,
 	}
 

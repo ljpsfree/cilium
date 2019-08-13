@@ -33,7 +33,6 @@ import (
 	"github.com/cilium/cilium/pkg/endpoint/regeneration"
 	"github.com/cilium/cilium/pkg/loadinfo"
 	"github.com/cilium/cilium/pkg/logging/logfields"
-	bpfconfig "github.com/cilium/cilium/pkg/maps/configmap"
 	"github.com/cilium/cilium/pkg/maps/ctmap"
 	"github.com/cilium/cilium/pkg/maps/eppolicymap"
 	"github.com/cilium/cilium/pkg/maps/lxcmap"
@@ -63,8 +62,9 @@ func (e *Endpoint) CallsMapPathLocked() string {
 }
 
 // BPFConfigMapPath returns the path to the BPF config map of endpoint.
+// TODO remove after v1.7 is released
 func (e *Endpoint) BPFConfigMapPath() string {
-	return bpf.LocalMapPath(bpfconfig.MapNamePrefix, e.ID)
+	return bpf.LocalMapPath("cilium_ep_config_", e.ID)
 }
 
 // BPFIpvlanMapPath returns the path to the ipvlan tail call map of an endpoint.
@@ -601,16 +601,6 @@ func (e *Endpoint) runPreCompilationSteps(regenContext *regenerationContext) (pr
 		e.realizedPolicy.PolicyMapState = make(policy.MapState)
 	}
 
-	if e.bpfConfigMap == nil {
-		e.bpfConfigMap, _, err = bpfconfig.OpenMapWithName(e.BPFConfigMapPath())
-		if err != nil {
-			return err
-		}
-		// Also reset the in-memory state of the realized state as the
-		// BPF map content is guaranteed to be empty right now.
-		e.realizedBPFConfig = &bpfconfig.EndpointConfig{}
-	}
-
 	// Only generate & populate policy map if a security identity is set up for
 	// this endpoint.
 	if e.SecurityIdentity != nil {
@@ -651,10 +641,6 @@ func (e *Endpoint) runPreCompilationSteps(regenContext *regenerationContext) (pr
 			datapathRegenCtxt.revertStack.Push(revertFunc)
 		}
 
-		// realizedBPFConfig may be updated at any point after we figure out
-		// whether ingress/egress policy is enabled.
-		e.desiredBPFConfig = bpfconfig.GetConfig(e)
-
 		// Synchronously try to update PolicyMap for this endpoint. If any
 		// part of updating the PolicyMap fails, bail out and do not generate
 		// BPF. Unfortunately, this means that the map will be in an inconsistent
@@ -667,20 +653,6 @@ func (e *Endpoint) runPreCompilationSteps(regenContext *regenerationContext) (pr
 		if err != nil {
 			return fmt.Errorf("unable to regenerate policy because PolicyMap synchronization failed: %s", err)
 		}
-
-		// Synchronously update the BPF ConfigMap for this endpoint.
-		// This is unlikely to fail, but will have the same
-		// inconsistency issues as above if there is a failure. Long
-		// term the solution to this is to templatize this map in the
-		// ELF file, but there's no solution to this just yet.
-		if err = e.bpfConfigMap.Update(e.desiredBPFConfig); err != nil {
-			e.getLogger().WithError(err).Error("unable to update BPF config map")
-			return err
-		}
-
-		datapathRegenCtxt.revertStack.Push(func() error {
-			return e.bpfConfigMap.Update(e.realizedBPFConfig)
-		})
 
 		// At this point, traffic is no longer redirected to the proxy for
 		// now-obsolete redirects, since we synced the updated policy map above.
@@ -1145,4 +1117,17 @@ func (e *Endpoint) RequireRouting() (required bool) {
 // RequireEndpointRoute returns if the endpoint wants a per endpoint route
 func (e *Endpoint) RequireEndpointRoute() bool {
 	return e.DatapathConfiguration.InstallEndpointRoute
+}
+
+// RemoveOldMaps removes any maps which were previously used by Cilium, but
+// which have been deprecated / are no longer used.
+func (e *Endpoint) RemoveOldMaps() {
+	maps := []string{e.BPFConfigMapPath()}
+	for _, oldMap := range maps {
+		if _, err := os.Stat(oldMap); err == nil {
+			if err = os.RemoveAll(oldMap); err == nil {
+				log.WithField(logfields.BPFMapPath, oldMap).Info("removed legacy map used by endpoint")
+			}
+		}
+	}
 }

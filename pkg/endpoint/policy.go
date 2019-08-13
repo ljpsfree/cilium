@@ -363,7 +363,9 @@ func (e *Endpoint) updateRealizedState(stats *regenerationStatistics, origDir st
 		e.syncPolicyMapController()
 	}
 
-	e.realizedBPFConfig = e.desiredBPFConfig
+	// Regeneration was successful - we can remove any state from prior versions
+	// of Cilium that needs to be cleaned up.
+	e.RemoveOldMaps()
 
 	// Set realized state to desired state.
 	e.realizedPolicy = e.desiredPolicy
